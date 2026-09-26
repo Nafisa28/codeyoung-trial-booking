@@ -239,3 +239,67 @@ Independently verified:
   #88) — confirmed the polish pass didn't break underlying functionality
 
 ---
+
+## Phase 5.5 — Major Redesign
+
+### Prompt:
+Make two fixes/changes to the React frontend. Keep all existing logic (fetch calls, booking submission, timezone handling, error states, validation) completely untouched.
+
+1. FIX — Confirmation screen contrast bug:
+The four detail boxes (Assigned Mentor, Parent/Student, Your Timezone, Booking Reference) currently have a dark background with dark text, making them nearly unreadable. Fix the contrast — either lighten these boxes to match the rest of the confirmation screen's card style, or make the text white/light if a dark background is intentional. They should be as readable as the green scheduled-time box and the light purple meeting-link box.
+
+2. RESTRUCTURE — Split into a landing view and a separate booking view:
+Currently the two-column layout (benefits on left, booking form on right) becomes visually uneven once scrolled, since the left column is much shorter than the right.
+
+Restructure into two distinct views within the same single-page app (no routing library needed — just conditional rendering based on a "view" state, e.g. 'landing' vs 'booking'):
+
+- Landing view: Keep the hero section, the "How it works" 3-step section, the "Why book a trial?" benefits, and the mentor avatars — all in a single clean column (no more awkward two-column split). At the bottom of this content, add a prominent "Book Your Free Trial →" call-to-action button.
+- Booking view: Clicking that CTA switches to a dedicated, focused view containing ONLY the Parent Name input, timezone/date selectors, and the slot grid (the actual booking form) — full width, clean, no distracting side content. Include a simple "← Back" link/button at the top of this view to return to the landing view.
+- After a successful booking, the confirmation screen replaces the booking view as it currently does.
+
+Keep the same visual design system (colors, fonts, spacing) across both views — this should feel like two pages of the same site, not two different apps.
+
+After making changes, list everything changed, and confirm no fetch/booking/timezone/validation logic was touched.
+
+### Response summary:
+Fixed confirmation screen contrast bug: the four detail boxes (Assigned 
+Mentor, Parent/Student, Your Timezone, Booking Reference) had a dark 
+background with dark text; restyled with light neutral background 
+(#f8fafc), high-contrast slate text (#0f172a), uppercase slate labels 
+(#64748b), and indigo-accented booking reference (#4f46e5) — now matches 
+the readability of the green scheduled-time and purple meeting-link boxes.
+
+Restructured the single-page layout into two distinct views via a 
+currentView state ('landing' vs 'booking'), avoiding any new routing 
+dependency:
+- Landing view: navbar (logo + rating badge + CTA), hero with headline 
+  and trust badges, "How It Works" 3-step section, "Why Book a Trial" 
+  benefit cards, "Meet Our Verified Mentors" avatar strip (decorative, 
+  not interactive), bottom CTA banner, footer.
+- Booking view: focused full-width form (parent name, timezone, date, 
+  morning/afternoon/evening categorized slot grid), with a "← Back to 
+  Overview" link to return to landing.
+- Confirmation screen (on HTTP 201) replaces the booking view as before, 
+  now with the fixed contrast styling.
+
+No fetch/booking/timezone/validation logic was touched — confirmed by 
+Antigravity and independently re-verified.
+
+Independently verified:
+- Landing page renders as a single clean column, no more uneven 
+  two-column scroll layout
+- Booking view is focused and full-width, functions identically to 
+  before the restructure
+- Confirmation screen detail boxes now fully readable (verified visually)
+- Full booking flow re-tested successfully after the restructure 
+  (bookings #91, #92)
+- Confirmed expected multi-mentor slot behavior: the same clock-hour 
+  (e.g. 9:00 AM) remains bookable by multiple parents since each booking 
+  matches to one of 10 independent mentors rather than reserving the 
+  entire hour globally — this is correct behavior per the Phase 1 
+  capacity design, not a bug
+- "Meet Our Verified Mentors" avatar section confirmed to be intentionally 
+  decorative (not interactive) — consistent with task scope, no click 
+  functionality required or added
+
+---

@@ -76,8 +76,9 @@ The frontend always defers to the backend for timezone conversion (re-fetching f
 
 ## Live Demo
 
-- Frontend: https://codeyoung-trial-booking.vercel.app
-- Backend API: https://codeyoung-trial-booking.onrender.com
+- Frontend (visit this): https://codeyoung-trial-booking.vercel.app
+- Backend API (not meant to be visited directly — used by the frontend): https://codeyoung-trial-booking.onrender.com
+  - Health check: https://codeyoung-trial-booking.onrender.com/health
 
 Note: hosted on free-tier services. The backend may take 30-60 seconds to 
 wake up on first request if idle (Render free tier spins down after 

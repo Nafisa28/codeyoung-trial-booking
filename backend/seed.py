@@ -29,7 +29,7 @@ def seed():
     cursor.execute("SELECT COUNT(*) FROM mentors")
     count = cursor.fetchone()[0]
     if count > 0:
-        print(f"⚠️  Mentors table already has {count} rows – skipping seed.")
+        print(f"[SKIP] Mentors table already has {count} rows - skipping seed.")
         conn.close()
         return
 
@@ -39,7 +39,7 @@ def seed():
     )
     conn.commit()
     conn.close()
-    print(f"🌱 Seeded {len(MENTORS)} mentors.")
+    print(f"[OK] Seeded {len(MENTORS)} mentors.")
 
 
 if __name__ == "__main__":

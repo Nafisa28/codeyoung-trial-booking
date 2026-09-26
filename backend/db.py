@@ -42,7 +42,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("✅ Database initialised – tables ready.")
+    print("[OK] Database initialised - tables ready.")
 
 
 if __name__ == "__main__":

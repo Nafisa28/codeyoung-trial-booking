@@ -1,3 +1,4 @@
+import os
 import uuid
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -7,7 +8,8 @@ from db import init_db, get_connection, DB_PATH
 import sqlite3
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])  # Vite dev server default
+frontend_origin = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+CORS(app, origins=[frontend_origin])
 
 
 @app.after_request

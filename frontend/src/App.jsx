@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const COMMON_TIMEZONES = [
   { value: 'America/New_York', label: 'US - Eastern (New York, Miami, Atlanta)' },
   { value: 'America/Chicago', label: 'US - Central (Chicago, Dallas, Houston)' },
@@ -128,7 +130,7 @@ export default function App() {
     setSlots([]);
 
     try {
-      const url = `http://localhost:5000/availability?date=${encodeURIComponent(
+      const url = `${API_BASE_URL}/availability?date=${encodeURIComponent(
         selectedDate
       )}&parent_timezone=${encodeURIComponent(timezone)}&_t=${Date.now()}`;
 
@@ -157,7 +159,7 @@ export default function App() {
         err.message === 'Failed to fetch' ||
         err.message?.includes('NetworkError') ||
         err.message?.includes('fetch')
-          ? 'Could not connect to backend server. Make sure the Flask server is running at http://localhost:5000.'
+          ? `Could not connect to backend server. Make sure the Flask server is running at ${API_BASE_URL}.`
           : err.message || 'An unexpected error occurred while fetching availability.';
       setError(errorMsg);
       setSlots([]);
@@ -204,7 +206,7 @@ export default function App() {
     setBookingError(null);
 
     try {
-      const url = `http://localhost:5000/book?_t=${Date.now()}`;
+      const url = `${API_BASE_URL}/book?_t=${Date.now()}`;
       const payload = {
         date: selectedDate,
         slot_utc: selectedSlot.utc_start,

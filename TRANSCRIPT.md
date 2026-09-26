@@ -72,3 +72,43 @@ Independently verified (not just AI-reported):
   underlying UTC times remain uniformly 1 hour apart throughout
 
 ---
+
+## Phase 2 — Booking Endpoint
+
+### Prompt:
+Add a POST /book endpoint to the Flask backend. Scope: ONLY this endpoint.
+
+Request body (JSON): { "date": "YYYY-MM-DD", "slot_utc": "<ISO 8601 UTC timestamp from /availability>", "parent_name": "...", "parent_timezone": "<IANA string>" }
+
+Logic:
+1. Re-check availability server-side for that exact slot and date (never trust the frontend) — find any mentor who is free for that slot and hasn't hit their 2-bookings/day cap
+2. If a mentor is available: create a booking row, generate a dummy link in the format "https://codeyoung-demo.example/session/<uuid4>", and return the booking confirmation as JSON with: mentor_name, slot time shown in BOTH parent_timezone and Asia/Kolkata (mentor's timezone), and the dummy_link
+3. If no mentor is available, return HTTP 409 with a JSON body distinguishing two cases:
+   - { "error": "day_fully_booked", "message": "..." } if every mentor is at their 2-booking daily cap
+   - { "error": "slot_unavailable", "message": "..." } if the day isn't full but this specific slot has no free mentor
+
+Handle the race condition where two requests hit this endpoint for the same slot at the same time — use a database transaction with a re-check immediately before the insert, so we never double-book a mentor beyond their 2/day cap.
+
+Do not build any frontend for this yet.
+
+Give me curl commands to test:
+1. A successful booking
+2. An attempt on a date that's already fully booked (use seed_full_day.py to set this up)
+3. Two rapid, near-simultaneous requests for the same single remaining slot — explain how to actually test this race condition (e.g. a small script firing both requests in parallel), not just two sequential curl calls
+
+### Response summary:
+Added POST /book with server-side re-validation, BEGIN IMMEDIATE transaction 
+locking for race safety, and differentiated 409 errors (day_fully_booked vs 
+slot_unavailable). Successful bookings return mentor assignment, dummy link 
+(uuid4), and slot time in both parent and mentor timezones.
+
+Independently verified:
+- Successful booking (id 82): confirmed request slot_utc, API response, and 
+  persisted DB row all match exactly
+- Fully-booked rejection: confirmed via DB query (2027-01-20, all mentors at capacity)
+- Race condition (2 simultaneous requests for the last slot on 2027-08-10): 
+  confirmed via DB that exactly one booking was inserted (all 10 mentors at 
+  exactly 2, not 1 or 3) — second request correctly received day_fully_booked 
+  since the winning request pushed the last available mentor to capacity
+
+---

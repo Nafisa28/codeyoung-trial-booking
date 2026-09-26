@@ -65,6 +65,11 @@ export default function App() {
 
   const minDate = getTodayIsoString();
 
+  // Check if every slot for the selected date is booked
+  const isFullyBooked = useMemo(() => {
+    return slots.length > 0 && slots.every((slot) => !slot.available);
+  }, [slots]);
+
   // 2. Fetch availability helper
   const fetchAvailability = useCallback(async (signal) => {
     if (!selectedDate) {
@@ -143,11 +148,11 @@ export default function App() {
     e.preventDefault();
 
     if (!parentName.trim()) {
-      setValidationError('Please enter parent name before confirming.');
+      setValidationError('Please enter your name to complete the booking.');
       return;
     }
     if (!selectedSlot) {
-      setBookingError('Please select a time slot.');
+      setBookingError('Please select an available time slot.');
       return;
     }
 
@@ -225,11 +230,16 @@ export default function App() {
   if (confirmedBooking) {
     return (
       <div className="container">
-        <header className="header">
+        {/* Brand Header */}
+        <header className="brand-header">
+          <div className="brand-logo-badge">
+            <span className="logo-symbol">&lt;/&gt;</span>
+            <span className="brand-name">Codeyoung</span>
+          </div>
           <div className="success-icon-badge">✓</div>
           <h1 className="title">Trial Class Confirmed!</h1>
           <p className="subtitle">
-            Your 1:1 live coding trial session has been successfully scheduled.
+            Your 1:1 live coding trial session has been reserved.
           </p>
         </header>
 
@@ -297,10 +307,16 @@ export default function App() {
   // -------------------------------------------------------------------------
   return (
     <div className="container">
-      <header className="header">
+      {/* Brand Header */}
+      <header className="brand-header">
+        <div className="brand-logo-badge">
+          <span className="logo-symbol">&lt;/&gt;</span>
+          <span className="brand-name">Codeyoung</span>
+          <span className="brand-tag">Trial Booking</span>
+        </div>
         <h1 className="title">Book a 1:1 Live Coding Trial Class</h1>
         <p className="subtitle">
-          Select your preferred date, time, and enter your details to reserve a mentor.
+          Select your date and time to reserve a personalized session with an expert mentor.
         </p>
       </header>
 
@@ -367,10 +383,12 @@ export default function App() {
           </div>
         </section>
 
-        {/* Status / Loading / Error */}
+        {/* Status / Loading / Error / Slot Grid */}
         <section className="slots-section">
           <div className="section-header">
-            <h2 className="section-title">Select a Time Slot ({slots.length})</h2>
+            <h2 className="section-title">
+              Available Slots {slots.length > 0 && `(${slots.filter((s) => s.available).length} open)`}
+            </h2>
             {selectedDate && (
               <span className="date-tag">
                 {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, {
@@ -406,12 +424,33 @@ export default function App() {
             </div>
           )}
 
-          {!loading && !error && slots.length === 0 && selectedDate && (
-            <div className="empty-state">No slots found for this date.</div>
+          {/* Empty state: No date chosen */}
+          {!loading && !error && !selectedDate && (
+            <div className="empty-state">
+              <span className="empty-state-icon">📅</span>
+              <strong>No Date Selected</strong>
+              <p>Please pick a trial date above to view available time slots.</p>
+            </div>
           )}
 
-          {!loading && !error && !selectedDate && (
-            <div className="empty-state">Please select a date above to view availability.</div>
+          {/* Empty state: No slots returned */}
+          {!loading && !error && slots.length === 0 && selectedDate && (
+            <div className="empty-state">
+              <span className="empty-state-icon">🔍</span>
+              <strong>No Slots Found</strong>
+              <p>No mentor slots are scheduled for this date. Please try another date.</p>
+            </div>
+          )}
+
+          {/* Edge state: Date is fully booked (all 12 slots unavailable) */}
+          {!loading && !error && isFullyBooked && (
+            <div className="fully-booked-banner">
+              <span className="banner-icon">⚠️</span>
+              <div>
+                <strong>This date is fully booked</strong>
+                <p>All mentor slots for this date are reserved. Please select another date above to find open trial slots.</p>
+              </div>
+            </div>
           )}
 
           {/* Slots Grid */}
@@ -431,7 +470,7 @@ export default function App() {
                   >
                     <span className="slot-time">{slot.local_start_for_parent}</span>
                     <span className="slot-status">
-                      {slot.available ? (isSelected ? 'Selected' : 'Available') : 'Booked'}
+                      {slot.available ? (isSelected ? 'Selected ✓' : 'Available') : 'Booked'}
                     </span>
                   </button>
                 );
@@ -460,7 +499,7 @@ export default function App() {
           {selectedSlot && (
             <div className="booking-action-bar">
               <div className="selected-slot-summary">
-                <span className="summary-label">Selected Slot:</span>
+                <span className="summary-label">Selected Slot</span>
                 <strong className="summary-time">{selectedSlot.local_start_for_parent}</strong>
               </div>
 

@@ -154,3 +154,46 @@ Independently verified:
   displays correctly; Retry successfully reloads slots once backend restarts
 
 ---
+
+## Phase 4 — Booking Submission & Confirmation Screen
+
+### Prompt:
+Wire up the booking submission and confirmation screen in the React frontend.
+
+- Add a "Parent Name" text input, shown above the slot grid, required before a booking can be submitted
+- When an available slot is clicked, instead of just logging to console, show a "Confirm Booking" button (or similar) that the parent clicks to actually submit
+- On confirm: POST to http://localhost:5000/book with { date, slot_utc, parent_name, parent_timezone }, using the same cache-busting/fetch approach as the availability calls
+- On success (HTTP 201): replace the booking form with a confirmation screen showing:
+  - The trial class time in the parent's local timezone (large, prominent)
+  - The mentor's name
+  - The dummy link, shown as a clickable button/link
+  - A smaller secondary line showing the same time converted to the mentor's timezone (Asia/Kolkata), labeled clearly as "mentor's local time" so it doesn't confuse the parent
+  - A "Book another slot" button to reset back to the picker
+- On 409 (day_fully_booked or slot_unavailable): show a friendly, non-technical error message specific to each case, and let the parent pick a different slot — refresh the availability list automatically since the slot they wanted may no longer be shown as free
+- On network/server error during submission: show a generic retry-able error, consistent with the pattern already used for availability fetching
+- Add basic validation: don't allow submission if parent name is empty
+
+Do not touch the availability-fetching logic that's already working — only add the new submission flow on top of it.
+
+### Response summary:
+Added Parent Name input with validation, slot confirmation flow (select → 
+"Confirm Booking" → POST /book), and a confirmation screen showing class 
+time in parent's local timezone, mentor's local time (Asia/Kolkata) 
+clearly labeled separately, mentor name, booking reference, and a dummy 
+meeting link. 409 errors (day_fully_booked / slot_unavailable) show 
+friendly messages and auto-refresh availability. "Book another slot" 
+resets to the picker.
+
+Independently verified:
+- Successful bookings (id 83, id 84) with different parent timezones: DB 
+  rows confirmed to exactly match displayed confirmation details
+- Dual-timezone display confirmed correct (America/New_York vs Asia/Kolkata 
+  shown as two different, correctly labeled times for the same moment)
+- Dummy link correctly points to a non-resolving placeholder domain, 
+  consistent with task requirements
+- Fully-booked date (2027-01-20): frontend correctly disables all 12 slots 
+  client-side; backend independently confirmed to return 409 
+  day_fully_booked via direct API call
+- "Book another slot" correctly resets to the picker form
+
+---

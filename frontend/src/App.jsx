@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 
 const COMMON_TIMEZONES = [
@@ -42,10 +42,17 @@ export default function App() {
 
   const [timezone, setTimezone] = useState(detectedTz);
   const [selectedDate, setSelectedDate] = useState(getTodayIsoString());
+  const [parentName, setParentName] = useState('');
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // Booking submission states
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState(null);
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [validationError, setValidationError] = useState('');
 
   // Timezone list including auto-detected if not in common list
   const timezoneOptions = useMemo(() => {
@@ -58,135 +65,270 @@ export default function App() {
 
   const minDate = getTodayIsoString();
 
-  // 2. Fetch availability on date or timezone change
-  useEffect(() => {
+  // 2. Fetch availability helper
+  const fetchAvailability = useCallback(async (signal) => {
     if (!selectedDate) {
       setSlots([]);
       setError(null);
       return;
     }
 
-    const abortController = new AbortController();
-
-    const fetchAvailability = async () => {
-      setLoading(true);
-      setError(null);
-      setSelectedSlot(null);
-      // Clear stale slots immediately so old data is never shown if fetch fails
-      setSlots([]);
-
-      try {
-        const url = `http://localhost:5000/availability?date=${encodeURIComponent(
-          selectedDate
-        )}&parent_timezone=${encodeURIComponent(timezone)}&_t=${Date.now()}`;
-
-        const response = await fetch(url, {
-          cache: 'no-store',
-          signal: abortController.signal,
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.message || errorData.error || `Server responded with HTTP ${response.status}`
-          );
-        }
-
-        const data = await response.json();
-        setSlots(data);
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          return;
-        }
-        console.error('Failed to fetch availability:', err);
-        const errorMsg =
-          err.message === 'Failed to fetch' ||
-          err.message?.includes('NetworkError') ||
-          err.message?.includes('fetch')
-            ? 'Could not connect to backend server. Make sure the Flask server is running at http://localhost:5000.'
-            : err.message || 'An unexpected error occurred while fetching availability.';
-        setError(errorMsg);
-        setSlots([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAvailability();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [selectedDate, timezone]);
-
-  const handleRetry = () => {
-    // Force re-fetch by triggering fetch with current state
-    if (!selectedDate) return;
     setLoading(true);
     setError(null);
     setSelectedSlot(null);
+    setBookingError(null);
     setSlots([]);
 
-    const url = `http://localhost:5000/availability?date=${encodeURIComponent(
-      selectedDate
-    )}&parent_timezone=${encodeURIComponent(timezone)}&_t=${Date.now()}`;
+    try {
+      const url = `http://localhost:5000/availability?date=${encodeURIComponent(
+        selectedDate
+      )}&parent_timezone=${encodeURIComponent(timezone)}&_t=${Date.now()}`;
 
-    fetch(url, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.message || errorData.error || `Server responded with HTTP ${response.status}`
-          );
-        }
-        return response.json();
-      })
-      .then((data) => {
-        setSlots(data);
-      })
-      .catch((err) => {
-        console.error('Retry failed:', err);
-        const errorMsg =
-          err.message === 'Failed to fetch' ||
-          err.message?.includes('NetworkError') ||
-          err.message?.includes('fetch')
-            ? 'Could not connect to backend server. Make sure the Flask server is running at http://localhost:5000.'
-            : err.message || 'An unexpected error occurred while fetching availability.';
-        setError(errorMsg);
-        setSlots([]);
-      })
-      .finally(() => {
-        setLoading(false);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal: signal || undefined,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || errorData.error || `Server responded with HTTP ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+      setSlots(data);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.error('Failed to fetch availability:', err);
+      const errorMsg =
+        err.message === 'Failed to fetch' ||
+        err.message?.includes('NetworkError') ||
+        err.message?.includes('fetch')
+          ? 'Could not connect to backend server. Make sure the Flask server is running at http://localhost:5000.'
+          : err.message || 'An unexpected error occurred while fetching availability.';
+      setError(errorMsg);
+      setSlots([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate, timezone]);
+
+  // Fetch on date / timezone change
+  useEffect(() => {
+    const abortController = new AbortController();
+    fetchAvailability(abortController.signal);
+    return () => {
+      abortController.abort();
+    };
+  }, [fetchAvailability]);
+
+  const handleRetry = () => {
+    fetchAvailability();
   };
 
   const handleSlotClick = (slot) => {
     if (!slot.available) return;
-    console.log('Selected slot:', slot);
     setSelectedSlot(slot);
+    setBookingError(null);
+    setValidationError('');
   };
 
+  // 3. Booking submission
+  const handleConfirmBooking = async (e) => {
+    e.preventDefault();
+
+    if (!parentName.trim()) {
+      setValidationError('Please enter parent name before confirming.');
+      return;
+    }
+    if (!selectedSlot) {
+      setBookingError('Please select a time slot.');
+      return;
+    }
+
+    setValidationError('');
+    setBookingLoading(true);
+    setBookingError(null);
+
+    try {
+      const url = `http://localhost:5000/book?_t=${Date.now()}`;
+      const payload = {
+        date: selectedDate,
+        slot_utc: selectedSlot.utc_start,
+        parent_name: parentName.trim(),
+        parent_timezone: timezone,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 201) {
+        // Success
+        setConfirmedBooking(data);
+        setSelectedSlot(null);
+      } else if (response.status === 409) {
+        // Conflict: day_fully_booked or slot_unavailable
+        let friendlyMsg = 'This slot is no longer available. Please choose a different slot.';
+        if (data.error === 'day_fully_booked') {
+          friendlyMsg = 'All mentors are fully booked for this date. Please select another date.';
+        } else if (data.error === 'slot_unavailable') {
+          friendlyMsg = 'This specific slot was just booked by another parent. Please choose another available slot.';
+        } else if (data.message) {
+          friendlyMsg = data.message;
+        }
+
+        setBookingError(friendlyMsg);
+        setSelectedSlot(null);
+        // Automatically refresh availability so parent sees current state
+        fetchAvailability();
+      } else {
+        throw new Error(data.message || data.error || `Booking failed with status ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Booking submission error:', err);
+      const msg =
+        err.message === 'Failed to fetch' || err.message?.includes('fetch')
+          ? 'Unable to connect to the server. Please check your connection and try again.'
+          : err.message || 'An error occurred during booking. Please try again.';
+      setBookingError(msg);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleBookAnother = () => {
+    setConfirmedBooking(null);
+    setSelectedSlot(null);
+    setBookingError(null);
+    setValidationError('');
+    fetchAvailability();
+  };
+
+  // -------------------------------------------------------------------------
+  // Render Confirmation Screen
+  // -------------------------------------------------------------------------
+  if (confirmedBooking) {
+    return (
+      <div className="container">
+        <header className="header">
+          <div className="success-icon-badge">✓</div>
+          <h1 className="title">Trial Class Confirmed!</h1>
+          <p className="subtitle">
+            Your 1:1 live coding trial session has been successfully scheduled.
+          </p>
+        </header>
+
+        <main className="card confirmation-card">
+          <div className="confirmation-highlight">
+            <span className="confirmation-label">Your Scheduled Class Time</span>
+            <div className="primary-time">{confirmedBooking.slot_parent_local}</div>
+            <div className="mentor-time-line">
+              <span className="mentor-time-badge">Mentor&apos;s Local Time (Asia/Kolkata):</span>{' '}
+              <strong>{confirmedBooking.slot_mentor_local}</strong>
+            </div>
+          </div>
+
+          <div className="confirmation-details-grid">
+            <div className="detail-item">
+              <span className="detail-label">Assigned Mentor</span>
+              <strong className="detail-value">{confirmedBooking.mentor_name}</strong>
+            </div>
+
+            <div className="detail-item">
+              <span className="detail-label">Parent / Student</span>
+              <strong className="detail-value">{confirmedBooking.parent_name}</strong>
+            </div>
+
+            <div className="detail-item">
+              <span className="detail-label">Your Timezone</span>
+              <span className="detail-value">{confirmedBooking.parent_timezone}</span>
+            </div>
+
+            <div className="detail-item">
+              <span className="detail-label">Booking Reference</span>
+              <span className="detail-value code-pill">#{confirmedBooking.booking_id}</span>
+            </div>
+          </div>
+
+          <div className="session-link-box">
+            <span className="session-link-label">Class Meeting Link:</span>
+            <div className="session-link-action">
+              <a
+                href={confirmedBooking.dummy_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="join-btn"
+              >
+                Join Trial Class Session ↗
+              </a>
+              <span className="raw-url">{confirmedBooking.dummy_link}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={handleBookAnother}
+          >
+            ← Book another slot
+          </button>
+        </main>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Render Booking Form & Slot Picker
+  // -------------------------------------------------------------------------
   return (
     <div className="container">
       <header className="header">
         <h1 className="title">Book a 1:1 Live Coding Trial Class</h1>
         <p className="subtitle">
-          Select your preferred date and time. All slots are converted to your local timezone.
+          Select your preferred date, time, and enter your details to reserve a mentor.
         </p>
       </header>
 
       <main className="card">
+        {/* Form Inputs Grid */}
         <section className="form-grid">
+          {/* Parent Name */}
+          <div className="form-group full-width">
+            <label htmlFor="parent-name" className="label">
+              Parent Name <span className="required-star">*</span>
+            </label>
+            <input
+              id="parent-name"
+              type="text"
+              className={`input ${validationError ? 'input-error' : ''}`}
+              placeholder="e.g. Sarah Jenkins"
+              value={parentName}
+              onChange={(e) => {
+                setParentName(e.target.value);
+                if (validationError) setValidationError('');
+              }}
+              required
+            />
+            {validationError && (
+              <span className="field-error-text">{validationError}</span>
+            )}
+          </div>
+
           {/* Timezone Selector */}
           <div className="form-group">
             <label htmlFor="tz-select" className="label">
@@ -228,7 +370,7 @@ export default function App() {
         {/* Status / Loading / Error */}
         <section className="slots-section">
           <div className="section-header">
-            <h2 className="section-title">Available Slots ({slots.length})</h2>
+            <h2 className="section-title">Select a Time Slot ({slots.length})</h2>
             {selectedDate && (
               <span className="date-tag">
                 {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, {
@@ -281,7 +423,7 @@ export default function App() {
                   <button
                     key={slot.utc_start}
                     type="button"
-                    disabled={!slot.available}
+                    disabled={!slot.available || bookingLoading}
                     onClick={() => handleSlotClick(slot)}
                     className={`slot-btn ${
                       slot.available ? 'available' : 'unavailable'
@@ -297,12 +439,46 @@ export default function App() {
             </div>
           )}
 
-          {/* Selected Slot Note */}
+          {/* Booking Error Banner (e.g. 409 Conflict or Network Error) */}
+          {bookingError && (
+            <div className="error-banner booking-error-banner">
+              <div className="error-content">
+                <strong>Booking Notice</strong>
+                <p>{bookingError}</p>
+              </div>
+              <button
+                type="button"
+                className="retry-btn"
+                onClick={() => setBookingError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Booking Action Bar */}
           {selectedSlot && (
-            <div className="selected-info">
-              <span>Selected Slot:</span>
-              <strong>{selectedSlot.local_start_for_parent}</strong>
-              <small>(Check console for slot object)</small>
+            <div className="booking-action-bar">
+              <div className="selected-slot-summary">
+                <span className="summary-label">Selected Slot:</span>
+                <strong className="summary-time">{selectedSlot.local_start_for_parent}</strong>
+              </div>
+
+              <button
+                type="button"
+                className="confirm-btn"
+                disabled={bookingLoading}
+                onClick={handleConfirmBooking}
+              >
+                {bookingLoading ? (
+                  <>
+                    <span className="btn-spinner" />
+                    Confirming Booking...
+                  </>
+                ) : (
+                  'Confirm Booking →'
+                )}
+              </button>
             </div>
           )}
         </section>

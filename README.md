@@ -73,3 +73,14 @@ The frontend always defers to the backend for timezone conversion (re-fetching f
 - Uses SQLite for simplicity; a production system would use a more robust database with proper connection pooling.
 - No automated test suite — all testing was done manually and is documented in `TRANSCRIPT.md`.
 - The "Meet Our Mentors" section on the landing page is decorative/non-interactive.
+
+## Live Demo
+
+- Frontend: https://codeyoung-trial-booking.vercel.app
+- Backend API: https://codeyoung-trial-booking.onrender.com
+
+Note: hosted on free-tier services. The backend may take 30-60 seconds to 
+wake up on first request if idle (Render free tier spins down after 
+inactivity), and the database resets on service restarts since it's not 
+using persistent storage in this deployment. For guaranteed, stable 
+testing, please use the local setup instructions above.

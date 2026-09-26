@@ -112,3 +112,45 @@ Independently verified:
   since the winning request pushed the last available mentor to capacity
 
 ---
+
+## Phase 3 — Frontend Slot Picker
+
+### Prompt:
+Build the React frontend (already scaffolded with Vite) for the parent booking flow. Scope: date + slot selection UI only, no booking submission yet.
+
+- Detect the browser's local timezone automatically using Intl.DateTimeFormat().resolvedOptions().timeZone, but let the parent override it via a dropdown of common IANA timezones (at least US and UK options, plus a few others)
+- A date picker for the trial class date (disable past dates)
+- On date selection, call GET http://localhost:5000/availability?date=...&parent_timezone=... and render the 12 slots as buttons, showing local_start_for_parent clearly on each
+- Slots where available is false are visibly disabled (greyed out, not clickable), not hidden
+- Show a loading spinner/state while fetching
+- Show a clear error state if the API call fails (e.g. backend not running)
+
+Do not implement booking submission yet — clicking an available slot should just log it to the console for now.
+
+Keep styling simple and clean — usability is what's being evaluated here, not visual flourish. Use plain CSS or a minimal approach, nothing heavy.
+
+### Response summary:
+Built React frontend with auto-detected browser timezone (manual override 
+dropdown for US/UK/EU/India/APAC), date picker with past dates disabled, 
+and a 12-slot grid fetched from /availability. Available slots are 
+clickable with visual selection feedback and console logging; unavailable 
+slots show as disabled ("Booked"). Timezone changes trigger a fresh 
+backend fetch (not client-side conversion), keeping the backend as the 
+single source of truth for DST-correct times.
+
+Bug found and fixed during verification: when the backend was stopped, 
+the frontend showed stale slot data instead of an error state, due to 
+browser HTTP caching and slots state not being reset on fetch failure. 
+Fixed with cache-busting headers/query param, immediate state reset on 
+fetch start, AbortController cleanup for rapid switching, and explicit 
+network-failure error messaging.
+
+Independently verified:
+- Fully-booked date correctly shows all 12 slots disabled
+- Timezone switch correctly re-fetches and shifts displayed times
+- Slot selection logs to console with visual highlight
+- Backend-down state: confirmed stale data clears, error banner with 
+  "Could not connect to backend server..." message and Retry button 
+  displays correctly; Retry successfully reloads slots once backend restarts
+
+---

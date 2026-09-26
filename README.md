@@ -85,3 +85,8 @@ wake up on first request if idle (Render free tier spins down after
 inactivity), and the database resets on service restarts since it's not 
 using persistent storage in this deployment. For guaranteed, stable 
 testing, please use the local setup instructions above.
+
+
+Note: the hosted demo uses a separate, independent database from local 
+development — test dates/bookings made locally won't appear here and 
+vice versa.
